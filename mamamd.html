@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https: http:; img-src https: http:; base-uri 'none'; form-action 'none'">
+<title>mamaMD</title>
+<style>
+  :root { color-scheme: light; }
+  body { max-width: 80ch; margin: auto; padding: 24px; background: #fff; color: #292d29; font: 15px/1.95 monospace; }
+  pre { margin: 0; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+  a, button { color: #37613e; text-underline-offset: 3px; }
+  button { font: inherit; background: none; border: 1px solid #aaa; cursor: pointer; }
+  .external { color: #73796e; font-size: 0.85em; }
+  #credit { margin: 0 0 24px; color: #73796e; font-size: 12px; overflow-wrap: anywhere; }
+  img { display: block; max-width: 100%; height: auto; margin: 12px 0; }
+  .heading { font-weight: 600; line-height: 1.8; }
+  .h1 { font-size: 1.65em; } .h2 { font-size: 1.4em; } .h3 { font-size: 1.2em; }
+  .h4 { font-size: 1.12em; } .h5, .h6 { font-size: 1.05em; }
+</style>
+<p id="credit" hidden><a id="original" rel="noreferrer noopener"></a> rendered with mamaMD</p>
+<pre id="source" aria-label="Markdown原文"></pre>
+<script>
+'use strict';
+const source = document.getElementById('source');
+
+// 配信元の文字列はHTMLとして解釈しない。文字は常にテキストノードで追加する。
+// Never interpret source text as HTML; always insert it as text nodes.
+function text(parent, value) {
+  parent.appendChild(document.createTextNode(value));
+}
+
+// リンクと画像に使えるのは、認証情報を含まないHTTP(S)のURLだけ。
+// Allow only HTTP(S) URLs without embedded credentials for links and images.
+function safeUrl(value, base) {
+  try {
+    const url = new URL(value, base);
+    return /^https?:$/.test(url.protocol) && !url.username && !url.password ? url : null;
+  } catch { return null; }
+}
+
+function link(parent, label, url, base, image) {
+  const anchor = document.createElement('a');
+  anchor.textContent = label;
+  // 同じ配信元の .md は、このビューアで続けて読む。表示するURLは原文のまま。
+  // Open same-origin .md links in this viewer; keep the displayed URL unchanged.
+  anchor.href = !image && url.origin === base.origin && /\.md$/i.test(url.pathname)
+    ? location.pathname + '?url=' + encodeURIComponent(url.href) : url.href;
+  anchor.rel = 'noreferrer noopener';
+  anchor.title = url.href;
+  parent.appendChild(anchor);
+  if (!image && url.origin !== base.origin) {
+    const mark = document.createElement('span');
+    mark.className = 'external';
+    mark.textContent = ' ↗';
+    mark.setAttribute('aria-label', '外部リンク');
+    parent.appendChild(mark);
+  }
+}
+
+// URLのオリジンで判定。画像配信先のリダイレクトはブラウザに従う。
+// Compare URL origins; image redirects follow normal browser behavior.
+function image(parent, url, base) {
+  const slot = document.createElement('span');
+  parent.appendChild(slot);
+  function show() {
+    const img = document.createElement('img');
+    img.alt = '画像: ' + url.href;
+    img.src = url.href;
+    slot.replaceChildren(img);
+  }
+  if (url.origin === base.origin) show();
+  else {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = '［外部画像を表示］';
+    button.title = url.href;
+    button.addEventListener('click', show, { once: true });
+    slot.appendChild(button);
+  }
+}
+
+// [説明](URL) / ![説明](URL) のURLの位置を調べる。括弧の入れ子にも対応。
+// Locate URLs in [label](URL) and ![label](URL), including nested parentheses.
+// 読み取れない記法は加工せず、そのまま表示する。
+// Leave unrecognized syntax unchanged.
+function destinationAt(value, start) {
+  const marker = /!?\[[^\]\n]*\]\(/y;
+  marker.lastIndex = start;
+  if (!marker.exec(value)) return null;
+  let begin = marker.lastIndex;
+  while (value[begin] === ' ' || value[begin] === '\t') begin++;
+  let end = begin;
+  if (value[begin] === '<') {
+    begin++;
+    end = value.indexOf('>', begin);
+    if (end < 0 || value.slice(begin, end).includes('\n')) return null;
+  } else {
+    let depth = 0;
+    for (; end < value.length; end++) {
+      const c = value[end];
+      if (/\s/.test(c)) break;
+      if (c === '\\') { end++; continue; }
+      if (c === '(') depth++;
+      if (c === ')') { if (depth === 0) break; depth--; }
+    }
+  }
+  if (end <= begin) return null;
+  const tail = end + (value[end] === '>' ? 1 : 0);
+  const closing = /^[ \t]*(?:(?:"[^"\n]*"|'[^'\n]*'|\([^\n)]*\))[ \t]*)?\)/.exec(value.slice(tail));
+  return closing ? { begin, end, finish: tail + closing[0].length, image: value[start] === '!' } : null;
+}
+
+function render(markdown, base) {
+  const fragment = document.createDocumentFragment();
+  let fence = null;
+  let code = null;
+  for (const line of markdown.match(/[^\n]*(?:\n|$)/g) || []) {
+    const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && /^\s*$/.test(line.slice(marker[0].length))) fence = null;
+      text(fragment, line);
+      continue;
+    }
+    if (!code && marker) { fence = marker[1]; text(fragment, line); continue; }
+    if (!code && /^( {4}|\t)/.test(line)) { text(fragment, line); continue; }
+    let parent = fragment;
+    const heading = !code && /^ {0,3}(#{1,6})(?:[ \t]+|\r?$)/.exec(line.replace(/\n$/, ''));
+    if (heading) {
+      parent = document.createElement('span');
+      parent.className = 'heading h' + heading[1].length;
+      parent.setAttribute('role', 'heading');
+      parent.setAttribute('aria-level', String(heading[1].length));
+      fragment.appendChild(parent);
+    }
+    let plainStart = 0;
+    for (let i = 0; i < line.length;) {
+      if (!code && line[i] === '\\') { i += 2; continue; }
+      if (line[i] === '`') {
+        const run = /^`+/.exec(line.slice(i))[0];
+        if (code === run) code = null;
+        else if (!code) code = run;
+        i += run.length;
+        continue;
+      }
+      if (code) { i++; continue; }
+      const destination = destinationAt(line, i);
+      const bare = !destination && (i === 0 || !/\w/.test(line[i - 1])) && /^https?:\/\/[^\s<>"'`]+/.exec(line.slice(i));
+      if (!destination && !bare) { i++; continue; }
+      let label = destination ? line.slice(destination.begin, destination.end) : bare[0].replace(/[.,;!?。、「」]+$/g, '');
+      if (bare) {
+        while (label.endsWith(')') && (label.match(/\)/g) || []).length > (label.match(/\(/g) || []).length) label = label.slice(0, -1);
+      }
+      const begin = destination ? destination.begin : i;
+      const end = begin + label.length;
+      const finish = destination ? destination.finish : end;
+      const url = safeUrl(label.replace(/\\([\\()])/g, '$1'), base.href);
+      text(parent, line.slice(plainStart, begin));
+      if (url) link(parent, label, url, base, destination && destination.image);
+      else text(parent, label);
+      text(parent, line.slice(end, finish));
+      if (url && destination && destination.image) image(parent, url, base);
+      plainStart = finish;
+      i = finish;
+    }
+    text(parent, line.slice(plainStart));
+  }
+  source.replaceChildren(fragment);
+}
+
+// ?articles/hello.md / ?https://… / ?url=… に対応。
+// Accept ?articles/hello.md, ?https://…, and ?url=….
+async function main() {
+  const credit = document.getElementById('credit');
+  credit.hidden = true;
+  try {
+    const query = location.search.slice(1);
+    const value = query.startsWith('url=') ? new URLSearchParams(query).get('url')
+      : /^https?:\/\//i.test(query) ? query : decodeURIComponent(query);
+    if (!value) {
+      source.textContent = 'mamaMD\n\nURLの末尾に ?url=MarkdownのURL を付けて開いてください。';
+      return;
+    }
+    const url = safeUrl(value, location.href);
+    // 相対指定は同じオリジンだけ。外部サイトはHTTP(S)の完全なURLで指定する。
+    // Relative references must resolve to the same origin; external sites require full HTTP(S) URLs.
+    if (!url || (!/^https?:\/\//i.test(value) && url.origin !== new URL(location.href).origin)) {
+      throw new Error('同じサイトの相対パス、またはHTTP(S)の完全なURLを指定してください。');
+    }
+    source.textContent = '読み込み中…';
+    // 本文の取得とMarkdownで指定された画像以外に通信しない。本文取得にCookieは送らない。
+    // Request only the Markdown and its specified images; omit cookies when fetching Markdown.
+    const response = await fetch(url.href, { credentials: 'omit' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    if ((response.headers.get('content-type') || '').includes('text/html')) throw new Error('MarkdownではなくHTMLが返されました。');
+    const markdown = await response.text();
+    if (markdown.length > 2000000) throw new Error('200万文字以下のファイルを指定してください。');
+    const base = new URL(response.url || url.href);
+    render(markdown, base);
+    const original = document.getElementById('original');
+    original.href = base.href;
+    original.textContent = base.href;
+    credit.hidden = false;
+  } catch (error) {
+    source.textContent = '取得できませんでした。' + error.message + '\n外部サイトの場合は、配信元のCORS許可が必要です。';
+  }
+}
+main();
+</script>
+</html>
