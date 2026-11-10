@@ -65,6 +65,7 @@ Markdown on external sites can also be specified using a full HTTP(S) URL, but t
 | HTML | Displays it as text; tags and scripts are not interpreted or executed |
 
 At the top of the body, the viewer displays a direct link to the source and `rendered with mamaMD`.
+The browser tab displays `mamaMD:Page title`, preferring `title` in YAML front matter enclosed by `---` at the start of the file (for example, `title: "Music without a screen"`). Single-line strings are supported. If the title is empty or cannot be read, the viewer uses the first level-one heading (`# Heading`), then the filename.
 
 “Same origin” means the same protocol, host, and port as the Markdown being read. If there is a redirect, the final Markdown URL is used as the reference. Relative links and image paths are also resolved against that URL.
 

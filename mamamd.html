@@ -168,6 +168,23 @@ function render(markdown, base) {
   source.replaceChildren(fragment);
 }
 
+// 先頭のYAMLメタデータから、1行の文字列として書かれたtitleを読む。
+// Read a single-line string title from leading YAML front matter.
+function metadataTitle(markdown) {
+  const front = /^(?:\uFEFF)?---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/.exec(markdown);
+  if (!front) return '';
+  const title = /^title:[ \t]*(.*)$/m.exec(front[1]);
+  if (!title) return '';
+  const value = title[1].trim();
+  const quoted = /^("(?:[^"\\]|\\.)*"|'(?:[^']|'')*')[ \t]*(?:#.*)?$/.exec(value);
+  if (quoted) {
+    if (value[0] === "'") return quoted[1].slice(1, -1).replace(/''/g, "'").trim();
+    try { return JSON.parse(quoted[1]).trim(); } catch { return ''; }
+  }
+  if (/^["'|>!&*\[{]/.test(value)) return '';
+  return value.replace(/[ \t]+#.*$/, '').trim();
+}
+
 // ?articles/hello.md / ?https://… / ?url=… に対応。
 // Accept ?articles/hello.md, ?https://…, and ?url=….
 async function main() {
@@ -197,6 +214,11 @@ async function main() {
     if (markdown.length > 2000000) throw new Error('200万文字以下のファイルを指定してください。');
     const base = new URL(response.url || url.href);
     render(markdown, base);
+    const heading = source.querySelector('.h1');
+    const headingTitle = heading ? heading.textContent.trim().replace(/^#\s*/, '').replace(/\s+#+$/, '').trim() : '';
+    let filename = base.pathname.split('/').pop();
+    try { filename = decodeURIComponent(filename); } catch {}
+    document.title = 'mamaMD:' + (metadataTitle(markdown) || headingTitle || filename || base.hostname);
     const original = document.getElementById('original');
     original.href = base.href;
     original.textContent = base.href;
