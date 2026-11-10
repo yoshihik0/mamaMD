@@ -14,7 +14,11 @@ The entire app is a single file, [mamamd.html](mamamd.html), containing HTML, CS
 
 The name mamaMD comes from the Japanese expression **そのまま (sono mama)**, meaning “as it is.” It reflects the idea of reading Markdown with as little change to the original as possible.
 
-Think of an open counter at a sushi bar: you can see the preparation and receive what is made right in front of you. mamaMD brings that spirit to reading Markdown. The writer’s markup and link destinations stay in view, with just a little help to make the text easier to read. The source and what you see stay close together.
+The aim is a reading experience like sitting at an open counter in a sushi bar.
+
+You can inspect the Markdown file itself, just as you can see the ingredients laid out at the counter. Like a chef making sushi right in front of you, mamaMD transforms that source text in your browser and serves it with minimal seasoning. From the raw ingredients to the finished result, keeping the process visible matters.
+
+The writer’s markup and link destinations stay in view, with just a little help to make the text easier to read. mamaMD keeps the source and its presentation close together.
 
 The viewer’s own workings are open to inspection, too. mamaMD is open source under the MIT License, so you can read the code, modify it, and use it on your own site.
 
