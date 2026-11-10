@@ -10,6 +10,14 @@ It keeps markers like `#` and `**`, as well as link URLs, visible while improvin
 
 The entire app is a single file, [mamamd.html](mamamd.html), containing HTML, CSS, and JavaScript. It requires no external libraries, CDN, Node.js, build step, or API key. Keeping the source easy to inspect is a central goal.
 
+## Concept
+
+The name mamaMD comes from the Japanese expression **そのまま (sono mama)**, meaning “as it is.” It reflects the idea of reading Markdown with as little change to the original as possible.
+
+Think of an open counter at a sushi bar: you can see the preparation and receive what is made right in front of you. mamaMD brings that spirit to reading Markdown. The writer’s markup and link destinations stay in view, with just a little help to make the text easier to read. The source and what you see stay close together.
+
+The viewer’s own workings are open to inspection, too. mamaMD is open source under the MIT License, so you can read the code, modify it, and use it on your own site.
+
 ## Usage
 
 Place `mamamd.html` on a static web server, then open it with the URL of the Markdown you want to read appended after `?`.
@@ -78,3 +86,7 @@ No CORS permission is needed when the viewer and Markdown are on the same origin
 - The display limit is 2 million characters.
 
 The viewer does not include server-side conversion or a proxy. The model is to publish the original Markdown and add minimal formatting on the reader’s side.
+
+## License
+
+[MIT License](LICENSE)
